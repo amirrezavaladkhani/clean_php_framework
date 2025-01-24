@@ -1,42 +1,68 @@
 <?php
-use Illuminate\Database\Capsule\Manager as Capsule;
-use Illuminate\Routing\Router;
+
 use Illuminate\Container\Container;
+use Illuminate\Database\Capsule\Manager as Capsule;
+use Illuminate\Events\Dispatcher;
+use Illuminate\Routing\Router;
+use Illuminate\Filesystem\Filesystem;
+use Illuminate\View\Factory;
+use Illuminate\View\FileViewFinder;
+use Illuminate\View\Engines\EngineResolver;
+use Illuminate\View\Engines\PhpEngine;
+use Illuminate\Routing\CallableDispatcher;
+use Illuminate\Http\Response;
 
 require_once __DIR__ . '/vendor/autoload.php';
 
-// Container
-$container = new Container;
-$router = new Router($container);
+// 1. Create the main Container
+$container = new Container();
 
-// ORM (Eloquent)
-$capsule = new Capsule;
+// 2. Register CallableDispatcher in the Container
+$container->bind('Illuminate\Routing\Contracts\CallableDispatcher', fn($container) => new CallableDispatcher($container));
+
+// 3. Create Event Dispatcher and Router
+$events = new Dispatcher($container);
+$router = new Router($events, $container);
+
+// 4. Configure ORM (Eloquent)
+$capsule = new Capsule();
 $capsule->addConnection([
-    'driver' => 'mysql',
-    'host' => '127.0.0.1',
-    'database' => 'erp_db',
-    'username' => 'project-access',
-    'password' => '*)74TLLtA5825ym*',
-    'charset' => 'utf8',
+    'driver'    => 'mysql',
+    'host'      => '127.0.0.1',
+    'database'  => 'erp_db',
+    'username'  => 'project-access',
+    'password'  => '*)74TLLtA5825ym*',
+    'charset'   => 'utf8',
     'collation' => 'utf8_persian_ci',
 ]);
 $capsule->setAsGlobal();
 $capsule->bootEloquent();
 
-// View Engine (Blade)
-$viewPaths = [__DIR__ . '/app/Views'];
-$cachePath = __DIR__ . '/storage/cache';
-$viewFactory = new Illuminate\View\Factory(
-    new Illuminate\View\Engines\EngineResolver,
-    new Illuminate\View\FileViewFinder($container, $viewPaths),
-    $container
-);
+// 5. Configure View Engine
+$filesystem = new Filesystem(); // For handling file operations
+$viewPaths = [__DIR__ . '/app/Views']; // Define paths for view files
+$cachePath = __DIR__ . '/storage/cache'; // Define path for cache files
 
-//  Container
+// Register the PHP engine for rendering views
+$resolver = new EngineResolver();
+$resolver->register('php', fn() => new PhpEngine());
+
+// Configure view finder and factory
+$viewFinder = new FileViewFinder($filesystem, $viewPaths);
+$viewFactory = new Factory($resolver, $viewFinder, $events);
+
+// Register the view factory in the Container
 $container->instance('view', $viewFactory);
 
-// module routers
+// 6. Load all module routes dynamically
 foreach (glob(__DIR__ . '/app/Modules/*/routes.php') as $routeFile) {
-    require $routeFile;
+    require_once $routeFile;
 }
 
+// 7. Define the "response" helper function
+if (!function_exists('response')) {
+    function response($content = '', $status = 200, $headers = [])
+    {
+        return new Response($content, $status, $headers);
+    }
+}

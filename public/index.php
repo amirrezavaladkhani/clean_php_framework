@@ -1,6 +1,12 @@
 <?php
+
 require_once __DIR__ . '/../bootstrap.php';
 
-$router->dispatch(
-    Illuminate\Http\Request::capture()
-);
+use Illuminate\Http\Request;
+
+// دریافت و هندل درخواست
+$request = Request::capture();
+$response = $router->dispatch($request);
+
+// ارسال پاسخ
+$response->send();

@@ -2,9 +2,10 @@
 
 use Illuminate\Routing\Router;
 use App\Modules\User\Controllers\UserController;
+use Illuminate\Http\Response;
 
 $router->get('/users', function () {
-    return response()->json(['message' => 'User module works!']);
+    return new Response(['message' => 'Welcome to the users page!'], 200, ['Content-Type' => 'application/json']);
 });
 
 $router->get('/api/users', [UserController::class, 'index']);
