@@ -32,5 +32,11 @@ $viewFactory = new Illuminate\View\Factory(
     $container
 );
 
-// ذخیره در Container
+//  Container
 $container->instance('view', $viewFactory);
+
+// module routers
+foreach (glob(__DIR__ . '/app/Modules/*/routes.php') as $routeFile) {
+    require $routeFile;
+}
+
