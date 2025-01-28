@@ -12,8 +12,6 @@ use Illuminate\View\Engines\PhpEngine;
 use Illuminate\Routing\CallableDispatcher;
 use Illuminate\Http\Response;
 
-require_once __DIR__ . '/vendor/autoload.php';
-
 // 1. Create the main Container
 $container = new Container();
 
@@ -27,12 +25,12 @@ $router = new Router($events, $container);
 // 4. Configure ORM (Eloquent)
 $capsule = new Capsule();
 $capsule->addConnection([
-    'driver'    => 'mysql',
-    'host'      => '127.0.0.1',
-    'database'  => 'erp_db',
-    'username'  => 'project-access',
-    'password'  => '*)74TLLtA5825ym*',
-    'charset'   => 'utf8',
+    'driver' => 'mysql',
+    'host' => '127.0.0.1',
+    'database' => 'erp_db',
+    'username' => 'project-access',
+    'password' => '*)74TLLtA5825ym*',
+    'charset' => 'utf8',
     'collation' => 'utf8_persian_ci',
 ]);
 $capsule->setAsGlobal();
@@ -66,3 +64,40 @@ if (!function_exists('response')) {
         return new Response($content, $status, $headers);
     }
 }
+
+// 8. Load global routes
+require_once __DIR__ . '/routes/web.php';
+
+// 9. Register Middleware
+$container->singleton('middleware', function ($container) {
+    return [
+        \App\Http\Middleware\NotFoundMiddleware::class,
+    ];
+});
+
+
+// 10. Middleware Runner Function
+function runMiddlewares($middlewares, $request, $callback)
+{
+    $pipeline = array_reduce(
+    array_reverse($middlewares),
+        function ($next, $middleware) {
+            return function ($request) use ($next, $middleware) {
+                return (new $middleware())->handle($request, $next);
+            };
+        },
+        $callback
+    );
+    return $pipeline($request);
+}
+
+// 11. Process request and handle response
+$request = \Illuminate\Http\Request::capture();
+$response = runMiddlewares(
+    $container->make('middleware'),
+    $request,
+    fn($request) => $router->dispatch($request)
+);
+
+// Send the response
+$response->send();
