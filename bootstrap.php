@@ -12,6 +12,9 @@ use Illuminate\View\Engines\PhpEngine;
 use Illuminate\Routing\CallableDispatcher;
 use Illuminate\Http\Response;
 
+require_once __DIR__ . '/vendor/autoload.php';
+
+
 // 1. Create the main Container
 $container = new Container();
 
@@ -35,6 +38,7 @@ $capsule->addConnection([
 ]);
 $capsule->setAsGlobal();
 $capsule->bootEloquent();
+
 
 // 5. Configure View Engine
 $filesystem = new Filesystem(); // For handling file operations
