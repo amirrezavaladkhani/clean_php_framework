@@ -1,7 +1,6 @@
 <?php
 
-use Illuminate\Routing\Router;
-use App\Modules\User\Controllers\UserController;
+use App\Modules\User\Http\Controllers\UserController;
 use Illuminate\Http\Response;
 
 $router->get('/users', function () {

@@ -128,12 +128,14 @@ if (!function_exists('url')) {
     }
 }
 
-// 12. Handle Incoming Request & Send Response
-$request = \Illuminate\Http\Request::capture();
-$response = runMiddlewares(
-    $container->make('middleware'),
-    $request,
-    fn($request) => $router->dispatch($request)
-);
 
-$response->send();
+// 12. Handle Incoming Request & Send Response
+if (PHP_SAPI !== 'cli') {
+    $request = \Illuminate\Http\Request::capture();
+    $response = runMiddlewares(
+        $container->make('middleware'),
+        $request,
+        fn($request) => $router->dispatch($request)
+    );
+    $response->send();
+}
