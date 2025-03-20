@@ -15,64 +15,62 @@ use Illuminate\Routing\CallableDispatcher;
 use Illuminate\Http\Response;
 
 require_once __DIR__ . '/vendor/autoload.php';
+require_once __DIR__ . '/app/Support/helpers.php';
 
-// 1. ایجاد Container و Event Dispatcher
+// 1. Create Application Container & Event Dispatcher
 $container = new Container();
 $events = new Dispatcher($container);
 
-// 2. ثبت CallableDispatcher در Container
-$container->bind('Illuminate\Routing\Contracts\CallableDispatcher', fn($container) => new CallableDispatcher($container));
+// 2. Register CallableDispatcher
+$container->bind(
+    'Illuminate\Routing\Contracts\CallableDispatcher',
+    fn($container) => new CallableDispatcher($container)
+);
 
-// 3. ایجاد Router
+// 3. Initialize Router
 $router = new Router($events, $container);
 
-// 4. تنظیم ORM (Eloquent)
+// 4. Setup Eloquent ORM (Database)
 $capsule = new Capsule();
-$capsule->addConnection([
-    'driver'    => 'mysql',
-    'host'      => '127.0.0.1',
-    'database'  => 'erp_db',
-    'username'  => 'project-access',
-    'password'  => '*)74TLLtA5825ym*',
-    'charset'   => 'utf8',
-    'collation' => 'utf8_persian_ci',
-]);
+$capsule->addConnection(config('database.connections.mysql'));
 $capsule->setAsGlobal();
 $capsule->bootEloquent();
 
-// 5. تنظیم Blade Engine
+// 5. Setup Blade View Engine
 $filesystem = new Filesystem();
-$viewPaths = [__DIR__ . '/resources/views'];
-$cachePath = __DIR__ . '/storage/cache';
+$viewPaths = config('view.paths');
+$cachePath = config('view.cache');
 
-// بررسی و ایجاد مسیر cache اگر وجود ندارد
+// Ensure cache directory exists
 if (!is_dir($cachePath)) {
     mkdir($cachePath, 0777, true);
 }
 
-// تنظیم Blade Compiler
+// Configure Blade Compiler
 $bladeCompiler = new BladeCompiler($filesystem, $cachePath);
 
-// تنظیم EngineResolver
+// Setup Engine Resolver for Blade & PHP Views
 $resolver = new EngineResolver();
-$resolver->register('blade', function () use ($bladeCompiler) {
-    return new CompilerEngine($bladeCompiler);
-});
+$resolver->register('blade', fn() => new CompilerEngine($bladeCompiler));
 $resolver->register('php', fn() => new PhpEngine());
 
-// تنظیم FileViewFinder و Factory برای Viewها
+// Configure View Factory
 $viewFinder = new FileViewFinder($filesystem, $viewPaths);
 $viewFactory = new Factory($resolver, $viewFinder, $events);
 
-// ثبت View Factory در Container
+// Register View Factory in Container
 $container->instance('view', $viewFactory);
 
-// 6. بارگذاری تمامی مسیرهای ماژول‌ها
-foreach (glob(__DIR__ . '/app/Modules/*/routes.php') as $routeFile) {
-    require_once $routeFile;
+// 6. Load Module Routes Dynamically
+$modules = config('modules.modules') ?? [];
+foreach ($modules as $module) {
+    $routeFile = __DIR__ . "/app/Modules/{$module}/routes.php";
+    if (file_exists($routeFile)) {
+        require_once $routeFile;
+    }
 }
 
-// 7. تعریف تابع response()
+// 7. Define Global Response Function
 if (!function_exists('response')) {
     function response($content = '', $status = 200, $headers = []): Response
     {
@@ -80,17 +78,17 @@ if (!function_exists('response')) {
     }
 }
 
-// 8. بارگذاری مسیرهای عمومی
-require_once __DIR__ . '/routes/web.php';
+// 8. Load General Routes
+$webRoutes = __DIR__ . '/routes/web.php';
+if (file_exists($webRoutes)) {
+    require_once $webRoutes;
+}
 
-// 9. ثبت Middlewareها در Container
-$container->singleton('middleware', function ($container) {
-    return [
-        \App\Http\Middleware\NotFoundMiddleware::class,
-    ];
-});
+// 9. Register Middleware
+$kernel = new \App\Http\Kernel();
+$container->singleton('middleware', fn($container) => $kernel->getMiddlewares());
 
-// 10. اجرای Middlewareها
+// 10. Middleware Execution Pipeline
 function runMiddlewares($middlewares, $request, $callback)
 {
     $pipeline = array_reduce(
@@ -105,7 +103,7 @@ function runMiddlewares($middlewares, $request, $callback)
     return $pipeline($request);
 }
 
-// 11. تعریف توابع
+// 11. Define Utility Functions
 if (!function_exists('view')) {
     function view($view, $data = [])
     {
@@ -130,9 +128,7 @@ if (!function_exists('url')) {
     }
 }
 
-
-
-// 12. پردازش درخواست و ارسال پاسخ
+// 12. Handle Incoming Request & Send Response
 $request = \Illuminate\Http\Request::capture();
 $response = runMiddlewares(
     $container->make('middleware'),
