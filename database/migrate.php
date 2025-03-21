@@ -7,10 +7,16 @@ require_once __DIR__ . '/../bootstrap.php';
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Filesystem\Filesystem;
 
-// Load all migration files
+$migrationPath = __DIR__ . DIRECTORY_SEPARATOR . 'migrations';
+
 $filesystem = new Filesystem();
 
-$migrations = $filesystem->files(__DIR__ . '/migrations');
+if (!$filesystem->exists($migrationPath)) {
+    echo "❌ Migration directory not found: $migrationPath\n";
+    exit(1);
+}
+
+$migrations = $filesystem->files($migrationPath);
 
 $action = $argv[1] ?? 'help';
 
@@ -71,6 +77,7 @@ foreach ($migrations as $migration) {
                 echo "⚠️ Migration '$className' already applied. Skipping...\n";
                 continue;
             }
+            
             $className::up();
             Capsule::table('migrations')->insert(['migration' => $className, 'created_at' => now()]);
             echo "✅ Migration '$className' executed successfully!\n";
