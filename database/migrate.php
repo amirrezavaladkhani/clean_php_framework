@@ -7,16 +7,10 @@ require_once __DIR__ . '/../bootstrap.php';
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Filesystem\Filesystem;
 
-$migrationPath = __DIR__ . DIRECTORY_SEPARATOR . 'migrations';
-
+// استانداردسازی مسیر مایگریشن‌ها
+$migrationsPath = __DIR__ . DIRECTORY_SEPARATOR . 'migrations';
 $filesystem = new Filesystem();
-
-if (!$filesystem->exists($migrationPath)) {
-    echo "❌ Migration directory not found: $migrationPath\n";
-    exit(1);
-}
-
-$migrations = $filesystem->files($migrationPath);
+$migrations = $filesystem->files($migrationsPath);
 
 $action = $argv[1] ?? 'help';
 
@@ -42,34 +36,17 @@ try {
     exit(1);
 }
 
-// Status Command
-if ($action === 'status') {
-    try {
-        $appliedMigrations = Capsule::table('migrations')->pluck('migration')->toArray();
-    } catch (PDOException $e) {
-        echo "❌ Cannot fetch migration status: " . $e->getMessage() . "\n";
-        exit(1);
-    }
-
-    if (empty($appliedMigrations)) {
-        echo "🔹 No migrations applied yet.\n";
-    } else {
-        echo "✅ Applied migrations:\n";
-        foreach ($appliedMigrations as $migration) {
-            echo "   - $migration\n";
-        }
-    }
-    exit(0);
-}
-
+// Load migrations dynamically
 foreach ($migrations as $migration) {
     require_once $migration;
     $className = pathinfo($migration, PATHINFO_FILENAME);
 
-    if (!class_exists($className)) {
+    if (!class_exists("database\\migrations\\$className")) {
         echo "❌ Migration class '$className' not found in $migration\n";
         continue;
     }
+
+    $className = "database\\migrations\\$className";
 
     try {
         if ($action === 'up') {
@@ -77,7 +54,6 @@ foreach ($migrations as $migration) {
                 echo "⚠️ Migration '$className' already applied. Skipping...\n";
                 continue;
             }
-            
             $className::up();
             Capsule::table('migrations')->insert(['migration' => $className, 'created_at' => now()]);
             echo "✅ Migration '$className' executed successfully!\n";

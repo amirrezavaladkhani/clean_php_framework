@@ -24,4 +24,11 @@ if (!function_exists('config')) {
 
         return $value;
     }
+
+    if (!function_exists('now')) {
+        function now(): string
+        {
+            return date('Y-m-d H:i:s');
+        }
+    }
 }
